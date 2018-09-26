@@ -10,12 +10,13 @@
 #include <windows.h>
 #include <locale.h>
 #include <dirent.h>
+#include <pthread.h>
+#include <string.h>
 
-//#include <pthread.h>
 //#include <semaphore.h>
 //#include <sys/stat.h>
 
-#define BYTE 1024
+#define BYTE 16384
 #define PORTA 5000
 #define BACKLOG 10
 
@@ -41,7 +42,7 @@ int main(int argc, char *argv[]){
 	
 	/*Listen File Descriptor (listenfd) and Conection File Descriptor (connfd)*/
 
-	int listenfd = 0, connfd = 0, sktbind = 0, sktlisten = 0;
+	int listenfd = 0, connfd = 0, sktbind = 0, sktlisten = 0, *id_socket;
 	struct sockaddr_in serv_addr; // por alocação automática
 
 	char sendBuff[BYTE];
@@ -98,8 +99,11 @@ int main(int argc, char *argv[]){
 		
 		while(connfd = accept(listenfd, (struct sockaddr*)NULL, NULL))
 		{
+			id_socket = malloc(sizeof(byte)); // aloca memoria para o conteudo do endereço ID do socket.
+			*id_socket = 0xffffcbd4; // atribuir o endereço ID do socket, pois connfd carrega em seu conteúdo o endereço de memória do socket e não o ID.
 			
-			printf("Cliente conectado!\n");
+			printf("Cliente %i conectado! \n",id_socket);
+			//printf("%x\n",&connfd);
 			
 			DIR *current_dir = NULL;
 			char current_dir_name[BYTE];
@@ -116,8 +120,6 @@ int main(int argc, char *argv[]){
 			{
 				
 				tamBuff = recv(connfd,recvBuff,BYTE, 0);
-				//tamBuff = recv(connfd,recvBuff,strlen(sendBuff), 0);
-				//tamBuff = read(connfd,recvBuff,BYTE);
 				recvBuff[tamBuff] = 0x00;
 				
 				retENT(recvBuff);
@@ -196,13 +198,18 @@ int main(int argc, char *argv[]){
 					printf("> %s\n",recvBuff);
 					Ajuda(connfd);
 				}else
+					
+				if (strcmp(recvBuff,"sair") == 0)
+				{
+					printf("> %s\n",recvBuff);		
+				}else
 					{
 						printf("> Cliente digitou comando inválido.\n");
 						Invalido(connfd);				
 					}
 			}while(strcmp(recvBuff,"sair") != 0);
 		
-			printf("Cliente desconectado.\n");
+			printf("Cliente %i desconectado.\n", id_socket);
 			close(connfd);
 			sleep(1);
 		}
@@ -217,10 +224,9 @@ void Ajuda(int connfd)
 {
 	char sendBuff[BYTE];
 	char recvBuff[BYTE];
-	//char current_dir_name[BYTE];
 	int tamBuff=0;
 	
-	snprintf(sendBuff, sizeof(sendBuff), "\n ########## AJUDA ##########\n  cdir    -  cria diretório\n  rdir    -remove diretório\n  edir    - entra diretório\n  sdir    -  sair diretório\n  mdir    -mostra diretório\n  cfile   -    cria arquivo\n  rfile   -  remove arquivo\n  efile   - escreve arquivo\n  mfile   -  mostra arquivo\n  cmd     -  comando prompt\n  sair    -        encerrar\n ###########################\n");
+	snprintf(sendBuff, sizeof(sendBuff), "\n\t ########## AJUDA ##########\n\t  cdir    -  cria diretório\n\t  rdir    -remove diretório\n\t  edir    - entra diretório\n\t  sdir    -  sair diretório\n\t  mdir    -mostra diretório\n\t  cfile   -    cria arquivo\n\t  rfile   -  remove arquivo\n\t  efile   - escreve arquivo\n\t  mfile   -  mostra arquivo\n\t  cmd     -  comando prompt\n\t  sair    -        encerrar\n\t ###########################\n");
 	send(connfd,sendBuff,strlen(sendBuff), 0);
 }
 
@@ -243,7 +249,7 @@ void Criar_DIR(int connfd)
 	recvBuff[tamBuff] = 0x00;
 	retENT(recvBuff);
 	
-	char comando[1024]  = "mkdir ";
+	char comando[BYTE]  = "mkdir ";
 	strcat(comando,recvBuff);
 		
 	if (system(comando) == 0)
@@ -276,7 +282,7 @@ void Remover_DIR(int connfd)
 	recvBuff[tamBuff] = 0x00;
 	retENT(recvBuff);
 	
-	char comando[1024]  = "rmdir ";
+	char comando[BYTE]  = "rmdir ";
 	strcat(comando,recvBuff);
 		
 	if (system(comando) == 0)
@@ -300,10 +306,7 @@ void Entrar_DIR(int connfd, DIR **current_dir)
 	char pasta[BYTE];
 	int tamBuff=0;
 
-
 	getcwd(current_dir_name, sizeof(current_dir_name));
-	
-	//printf("current_dir_name>%s \n",current_dir_name);
 	
 	snprintf(sendBuff, sizeof(sendBuff), "Entrar em diretório, digite o nome: \n");
 	send(connfd,sendBuff,strlen(sendBuff), 0);
@@ -317,8 +320,6 @@ void Entrar_DIR(int connfd, DIR **current_dir)
     strcpy(pasta,current_dir_name);
 	strcat(pasta,"/");
 	strcat(pasta,recvBuff);
-	
-	//printf("pasta>%s \n",pasta);
 	
     if (chdir(pasta) == 0)	// chdir - altera o diretório de trabalho
 	{
@@ -345,17 +346,12 @@ void Sair_DIR(int connfd, DIR **current_dir)
 	char pasta[BYTE];
 	int tamBuff=0;
 
-
 	getcwd(current_dir_name, sizeof(current_dir_name));
-	
-	//printf("current_dir_name>%s \n",current_dir_name);
 	
 	memset(pasta, 0, sizeof(pasta)); // preenche área de memoria com 0
 	
     strcpy(pasta,current_dir_name);
 	strcat(pasta,"/..");
-	
-	//printf("pasta>%s \n",pasta);
 	
     if (chdir(pasta) == 0)	// chdir - altera o diretório de trabalho
 	{
@@ -381,8 +377,6 @@ void Mostrar_DIR(int connfd, DIR *current_dir)
 	char current_dir_name[BYTE];
 	struct dirent *dir = NULL;
 	
-	dir = readdir(current_dir);
-	dir = readdir(current_dir);
 	getcwd(current_dir_name, sizeof(current_dir_name));
 	
 	memset(sendBuff, 0, sizeof(sendBuff)); // preenche área de memoria com 0
@@ -418,7 +412,7 @@ void Criar_FILE(int connfd)
 	recvBuff[tamBuff] = 0x00;
 	retENT(recvBuff);
 	
-	char comando[1024]  = "touch ";
+	char comando[BYTE]  = "touch ";
 	strcat(comando,recvBuff);
 		
 	if (system(comando) == 0)
@@ -436,30 +430,6 @@ void Criar_FILE(int connfd)
 
 void Remover_FILE(int connfd)
 {
-	
-	
-}  
-
-
-
-void Escrever_FILE(int connfd)
-{
-	
-	
-} 
-
-
-
-void Mostrar_FILE(int connfd)
-{
-	
-	
-} 
-
-
-
-void CMD(int connfd)
-{
 	char sendBuff[BYTE];
 	char recvBuff[BYTE];
 	//char current_dir_name[BYTE];
@@ -468,6 +438,123 @@ void CMD(int connfd)
 	//getcwd(current_dir_name, sizeof(current_dir_name));
 	//printf("%s\n",current_dir_name);
 	
+	snprintf(sendBuff, sizeof(sendBuff), "Remover arquivo, digite o nome: \n");
+	send(connfd,sendBuff,strlen(sendBuff), 0);
+	
+	tamBuff = recv(connfd,recvBuff,BYTE, 0);
+	recvBuff[tamBuff] = 0x00;
+	retENT(recvBuff);
+	
+	char comando[BYTE]  = "rm ";
+	strcat(comando,recvBuff);
+	
+	if (system(comando) == 0)
+	{
+		snprintf(sendBuff, sizeof(sendBuff), "Arquivo removido com sucesso. \n");
+		send(connfd,sendBuff,strlen(sendBuff), 0);
+	}else
+		{			
+		snprintf(sendBuff, sizeof(sendBuff), "Erro ao remover arquivo. \n");
+		send(connfd,sendBuff,strlen(sendBuff), 0);
+		}
+}  
+
+
+
+void Escrever_FILE(int connfd)
+{
+	char sendBuff[BYTE];
+	char recvBuff[BYTE];
+	char conteudo[BYTE];
+	//char current_dir_name[BYTE];
+	int tamBuff=0;
+
+	//getcwd(current_dir_name, sizeof(current_dir_name));
+	//printf("%s\n",current_dir_name);
+	
+	snprintf(sendBuff, sizeof(sendBuff), "Escrever em arquivo, digite o nome: \n");
+	send(connfd,sendBuff,strlen(sendBuff), 0);
+	
+	tamBuff = recv(connfd,recvBuff,BYTE, 0);
+	recvBuff[tamBuff] = 0x00;
+	retENT(recvBuff);
+ 
+	FILE *arquivo; 
+	
+	if(arquivo = fopen(recvBuff,"a+")) // abertura como escrita no final e não cria novo arquivo se não existir
+	{ 
+		snprintf(sendBuff, sizeof(sendBuff), "Digite o texto: \n");
+		send(connfd,sendBuff,strlen(sendBuff), 0);	
+		
+		tamBuff = recv(connfd,recvBuff,BYTE, 0);
+		recvBuff[tamBuff] = 0x00;
+		retENT(recvBuff);
+		
+		strcat(recvBuff,"\n");
+		
+		if(fprintf(arquivo,recvBuff) < 0)
+		{
+			snprintf(sendBuff, sizeof(sendBuff), "Não foi possivel escrever no arquivo.\n");
+			send(connfd,sendBuff,strlen(sendBuff), 0);
+		}else
+			{
+				snprintf(sendBuff, sizeof(sendBuff), "Arquivo salvo. \n");
+				send(connfd,sendBuff,strlen(sendBuff), 0);			
+			}
+		
+	}else
+		{			
+		snprintf(sendBuff, sizeof(sendBuff), "Não foi possivel abrir o arquivo.\n");
+		send(connfd,sendBuff,strlen(sendBuff), 0);
+		}
+	fclose(arquivo);
+}
+
+
+
+void Mostrar_FILE(int connfd)
+{
+	char sendBuff[BYTE];
+	char recvBuff[BYTE];
+	char conteudo[BYTE];
+	//char current_dir_name[BYTE];
+	int tamBuff=0;
+
+	//getcwd(current_dir_name, sizeof(current_dir_name));
+	//printf("%s\n",current_dir_name);
+	
+	snprintf(sendBuff, sizeof(sendBuff), "Mostrar arquivo, digite o nome: \n");
+	send(connfd,sendBuff,strlen(sendBuff), 0);
+	
+	tamBuff = recv(connfd,recvBuff,BYTE, 0);
+	recvBuff[tamBuff] = 0x00;
+	retENT(recvBuff);
+ 
+	FILE *arquivo; 
+	
+	if(arquivo = fopen(recvBuff,"r"))
+	{ 
+		memset(sendBuff, 0, sizeof(sendBuff)); // preenche área de memoria com 0
+		strcat(sendBuff,"\n");
+		fread(sendBuff, sizeof(char),BYTE-2,arquivo);
+		strcat(sendBuff,"\n");
+		send(connfd,sendBuff,strlen(sendBuff), 0);
+	}else
+		{			
+		snprintf(sendBuff, sizeof(sendBuff), "Não foi possivel abrir o arquivo.\n");
+		send(connfd,sendBuff,strlen(sendBuff), 0);
+		}
+	fclose(arquivo);
+}
+
+
+
+void CMD(int connfd)
+{
+	char sendBuff[BYTE];
+	char recvBuff[BYTE];
+	int tamBuff=0;
+	
 	snprintf(sendBuff, sizeof(sendBuff), "Digite o comando: \n");
 	send(connfd,sendBuff,strlen(sendBuff), 0);
 	
@@ -475,7 +562,7 @@ void CMD(int connfd)
 	recvBuff[tamBuff] = 0x00;
 	retENT(recvBuff);
 
-	char comando[1024]  = "";
+	char comando[BYTE]  = "";
 	strcat(comando,recvBuff);
 	
 	if (system(comando) == 0)
@@ -496,11 +583,7 @@ void Invalido(int connfd)
 {
 	char sendBuff[BYTE];
 	char recvBuff[BYTE];
-	//char current_dir_name[BYTE];
 	int tamBuff=0;
-
-	//getcwd(current_dir_name, sizeof(current_dir_name));
-	//printf("%s\n",current_dir_name);
 	
 	snprintf(sendBuff, sizeof(sendBuff), "Comando inválido. Ajuda -h \n");
 	send(connfd,sendBuff,strlen(sendBuff), 0);
@@ -508,7 +591,7 @@ void Invalido(int connfd)
 
 
 
-void retENT(char *recvBuff)
+void retENT(char *recvBuff)	// remove ENTER do final do buffer
 {
 	
 	if (recvBuff[strlen(recvBuff)-1] == 10)
