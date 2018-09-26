@@ -7,18 +7,13 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/types.h>
-#include <time.h>
 #include <windows.h>
 #include <locale.h>
 
-//#include <dirent.h>
-//#include <pthread.h>
-//#include <semaphore.h>
-//#include <sys/stat.h>
 
 
 #define SERVER_IP "127.0.0.1"
-#define BYTE 1024
+#define BYTE 16384
 #define PORTA 5000
 #define TITULO "\n ###### EXPLORADOR DE ARQUIVOS CLIENTE ######\n\n"
 
