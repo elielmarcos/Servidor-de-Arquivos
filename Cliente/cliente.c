@@ -15,7 +15,7 @@
 #define SERVER_IP "127.0.0.1"
 #define BYTE 16384
 #define PORTA 5000
-#define TITULO "\n ###### EXPLORADOR DE ARQUIVOS CLIENTE ######\n\n"
+#define TITULO "\n ====\033[43m EXPLORADOR DE ARQUIVOS CLIENTE \033[40m====\n\n"
 
 void Aguarde(void);
 
@@ -27,7 +27,6 @@ int main(int argc, char *argv[])
     char mensagem[BYTE], *loc;
     int tbuf, skt, escolha;
     struct sockaddr_in serv;
-    system("clear");
 
     /**INICIALIZA ESTRUTURA SOCKETS*/
     skt = socket(AF_INET, SOCK_STREAM, 6);
@@ -40,14 +39,16 @@ int main(int argc, char *argv[])
     while(connect (skt, (struct sockaddr *)&serv, sizeof (struct sockaddr)) != 0){
         Aguarde();      ///AGUARDA SERVIDOR SE COMUNICAR
     }
-    printf(">> A Conexão com o Servidor %s foi estabelecida na porta %d\n\n",SERVER_IP,PORTA);
-    printf(">> Envie sair pra encerrar ou -h para ajuda \n\n");
+	system("clear");
+	printf(TITULO);
+    printf("> A Conexão com o Servidor %s foi estabelecida na porta %d\n\n",SERVER_IP,PORTA);
+    printf("> Envie sair pra encerrar ou -h para ajuda \n\n");
 
 
     /**RECEBE MENSAGEM DO SERVIDOR*/
     tbuf = recv (skt, mensagem, BYTE, 0);
     mensagem[tbuf] = 0x00;
-    printf (">: %s\n",mensagem);
+    printf ("> %s\n",mensagem);
 
 
     /**LOOP DE COMUNICAÇÃO ENTRE CLIENTE E SERVIDOR*/
@@ -71,7 +72,7 @@ int main(int argc, char *argv[])
 
     /**FINALIZA CONEXÃO*/
     close(skt);
-    printf (">>A conexão com o servidor foi finalizada!!!\n\n");
+    printf (">> \033[43mA conexão com o servidor foi finalizada!!!\033[40m\n\n");
 	sleep(3);
     exit(0);
 }
@@ -84,14 +85,14 @@ int main(int argc, char *argv[])
 ***************************************************************/
 void Aguarde(){
     int i=0;
-    char dot[12] = "";
+    char ponto[12] = "";
     for(i=0; i<4;i++){
         system("clear");
         printf(TITULO);
         printf("\n\nProcurando servidor.");
-        printf("\nAguarde %s\n\n", dot);
-        strcat(dot,".");
+        printf("\nAguarde %s\n\n", ponto);
+        strcat(ponto,".");
         sleep(1);
     }
-    strcpy(dot, "");
+    strcpy(ponto, "");
 }

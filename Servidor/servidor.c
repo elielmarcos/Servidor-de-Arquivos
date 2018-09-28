@@ -19,13 +19,14 @@
 #define BYTE 16384
 #define PORTA 5000
 #define BACKLOG 10
+#define TITULO "\n =======\033[43m SERVIDOR DE ARQUIVOS \033[40m=======\n\n"
 
 void Ajuda(int connfd);
 void Criar_DIR(int connfd);
 void Remover_DIR(int connfd);
-void Entrar_DIR(int connfd, DIR **current_dir);
-void Sair_DIR(int connfd, DIR **current_dir);
-void Mostrar_DIR(int connfd, DIR *current_dir);
+void Entrar_DIR(int connfd, DIR **dir_Atual);
+void Sair_DIR(int connfd, DIR **dir_Atual);
+void Mostrar_DIR(int connfd, DIR *dir_Atual);
 void Criar_FILE(int connfd);
 void Remover_FILE(int connfd);
 void Escrever_FILE(int connfd);
@@ -47,15 +48,17 @@ int main(int argc, char *argv[]){
 
 	char sendBuff[BYTE];
 	char recvBuff[BYTE];
-	char current_dir_name[BYTE];
+	char dir_Caminho[BYTE];
 	int tamBuff=0;
+	
+	printf(TITULO);
 
 	/* Zera a struct*/
 	listenfd = socket(AF_INET, SOCK_STREAM,6); // AF_INET  Arpa Internet Protocols, SOCK_STREAM socket por stream, 0  Internet Protocol
 	
 	if (listenfd == -1) // verifica se ocorreu erro na criação do socket descritor
 	{
-		printf("Erro: Criar socket descritor.\n");
+		printf("\033[41mErro: Criar socket descritor.\033[40m\n");
 	}else
 		printf("Criado socket descritor!\n");
 	
@@ -79,7 +82,7 @@ int main(int argc, char *argv[]){
 	
 	if (sktbind == -1) // verifica se ocorreu erro na associção do socket a um endereço
 	{
-		printf("Erro: Bind socket.\n");
+		printf("\033[41mErro: Bind socket.\033[40m\n");
 	}else
 		printf("Bind socket!\n");	
 	
@@ -87,7 +90,7 @@ int main(int argc, char *argv[]){
 	
 	if (sktlisten == -1) // verifica se ocorreu erro na fila
 	{
-		printf("Erro: Listen socket.\n");
+		printf("\033[41mErro: Listen socket.\033[40m\n");
 	}else
 		printf("Listen socket!\n");	
 
@@ -95,7 +98,7 @@ int main(int argc, char *argv[]){
 	
 	while(1){
 		
-		printf("Aguardando conexão.\n");
+		printf("Aguardando conexão.\n\n");
 		
 		while(connfd = accept(listenfd, (struct sockaddr*)NULL, NULL))
 		{
@@ -105,15 +108,15 @@ int main(int argc, char *argv[]){
 			printf("Cliente %i conectado! \n",id_socket);
 			//printf("%x\n",&connfd);
 			
-			DIR *current_dir = NULL;
-			char current_dir_name[BYTE];
+			DIR *dir_Atual = NULL;
+			char dir_Caminho[BYTE];
 
-			getcwd(current_dir_name, sizeof(current_dir_name)); // getcwd - obtém o nome do caminho do diretório de trabalho atual
-			current_dir = opendir(current_dir_name);	// opendir - abre um diretório
+			getcwd(dir_Caminho, sizeof(dir_Caminho)); // getcwd - obtém o nome do caminho do diretório de trabalho atual
+			dir_Atual = opendir(dir_Caminho);	// opendir - abre um diretório
 
-			printf(">Diretório atual: %s\n\n",current_dir_name);
+			printf(">Diretório atual: %s\n\n",dir_Caminho);
 
-			snprintf(sendBuff, sizeof(sendBuff), "Conectado!\n> Diretório atual: %s\n",current_dir_name);
+			snprintf(sendBuff, sizeof(sendBuff), "Conectado!\n> Diretório atual: %s\n",dir_Caminho);
 			send(connfd,sendBuff,strlen(sendBuff), 0);
 		
 			do
@@ -127,7 +130,7 @@ int main(int argc, char *argv[]){
 				
 				if (tamBuff < 0) // erro na recepção de mensagem
 				{
-					printf("Erro: Buffer de entrada.\n");
+					printf("\033[41mErro: Buffer de entrada.\033[40m\n");
 					snprintf(recvBuff, sizeof(recvBuff), "sair");
 					tamBuff = strlen(recvBuff);
 
@@ -135,81 +138,81 @@ int main(int argc, char *argv[]){
 				
 				if (strcmp(recvBuff,"cdir") == 0)
 				{
-					printf("> %s\n",recvBuff);
+					printf("> (%i) %s\n",id_socket,recvBuff);
 					Criar_DIR(connfd);
 				}else
 				
 				if (strcmp(recvBuff,"rdir") == 0)
 				{
-					printf("> %s\n",recvBuff);
+					printf("> (%i) %s\n",id_socket,recvBuff);
 					Remover_DIR(connfd);
 				}else
 				
 				if (strcmp(recvBuff,"edir") == 0)
 				{
-					printf("> %s\n",recvBuff);
-					Entrar_DIR(connfd,&current_dir);
+					printf("> (%i) %s\n",id_socket,recvBuff);
+					Entrar_DIR(connfd,&dir_Atual);
 				}else
 					
 				if (strcmp(recvBuff,"sdir") == 0)
 				{
-					printf("> %s\n",recvBuff);
-					Sair_DIR(connfd,&current_dir);
+					printf("> (%i) %s\n",id_socket,recvBuff);
+					Sair_DIR(connfd,&dir_Atual);
 				}else
 
 				if (strcmp(recvBuff,"mdir") == 0)
 				{
-					printf("> %s\n",recvBuff);
-					Mostrar_DIR(connfd,current_dir);
+					printf("> (%i) %s\n",id_socket,recvBuff);
+					Mostrar_DIR(connfd,dir_Atual);
 				}else
 				
 				if (strcmp(recvBuff,"cfile") == 0)
 				{
-					printf("> %s\n",recvBuff);
+					printf("> (%i) %s\n",id_socket,recvBuff);
 					Criar_FILE(connfd);
 				}else
 				
 				if (strcmp(recvBuff,"rfile") == 0)
 				{
-					printf("> %s\n",recvBuff);
+					printf("> (%i) %s\n",id_socket,recvBuff);
 					Remover_FILE(connfd);
 				}else
 				
 				if (strcmp(recvBuff,"efile") == 0)
 				{
-					printf("> %s\n",recvBuff);
+					printf("> (%i) %s\n",id_socket,recvBuff);
 					Escrever_FILE(connfd);
 				}else
 
 				if (strcmp(recvBuff,"mfile") == 0)
 				{
-					printf("> %s\n",recvBuff);
+					printf("> (%i) %s\n",id_socket,recvBuff);
 					Mostrar_FILE(connfd);
 				}else
 				
 				if (strcmp(recvBuff,"cmd") == 0)
 				{
-					printf("> %s\n",recvBuff);
+					printf("> (%i) %s\n",id_socket,recvBuff);
 					CMD(connfd);		
 				}else
 				
 				if (strcmp(recvBuff,"-h") == 0)
 				{
-					printf("> %s\n",recvBuff);
+					printf("> (%i) %s\n",id_socket,recvBuff);
 					Ajuda(connfd);
 				}else
 					
 				if (strcmp(recvBuff,"sair") == 0)
 				{
-					printf("> %s\n",recvBuff);		
+					printf("> (%i) %s\n",id_socket,recvBuff);	
 				}else
 					{
-						printf("> Cliente digitou comando inválido.\n");
+						printf("> (%i) Cliente digitou comando inválido.\n"),id_socket;
 						Invalido(connfd);				
 					}
 			}while(strcmp(recvBuff,"sair") != 0);
 		
-			printf("Cliente %i desconectado.\n", id_socket);
+			printf("> Cliente %i desconectado.\n", id_socket);
 			close(connfd);
 			sleep(1);
 		}
@@ -226,9 +229,16 @@ void Ajuda(int connfd)
 	char recvBuff[BYTE];
 	int tamBuff=0;
 	
-	snprintf(sendBuff, sizeof(sendBuff), "\n\t ########## AJUDA ##########\n\t  cdir    -  cria diretório\n\t  rdir    -remove diretório\n\t  edir    - entra diretório\n\t  sdir    -  sair diretório\n\t  mdir    -mostra diretório\n\t  cfile   -    cria arquivo\n\t  rfile   -  remove arquivo\n\t  efile   - escreve arquivo\n\t  mfile   -  mostra arquivo\n\t  cmd     -  comando prompt\n\t  sair    -        encerrar\n\t ###########################\n");
+	snprintf(sendBuff, sizeof(sendBuff), "\n\t╔══\033[43m AJUDA \033[40m════════════════X═╗\n\t║ cdir    -  cria diretório ║\n\t║ rdir    -remove diretório ║\n\t║ edir    - entra diretório ║\n\t║ sdir    -  sair diretório ║\n\t║ mdir    -mostra diretório ║\n\t║ cfile   -    cria arquivo ║\n\t║ rfile   -  remove arquivo ║\n\t║ efile   - escreve arquivo ║\n\t║ mfile   -  mostra arquivo ║\n\t║ cmd     -  comando prompt ║\n\t║ sair    -        encerrar ║\n\t╚═══════════════════════════╝\n");
 	send(connfd,sendBuff,strlen(sendBuff), 0);
+
+
+/*
+185 ╣	186 ║	187 ╗	188 ╝	200 ╚	201 ╔	202 ╩	203 ╦	204 ╠	205 ═	206 ╬
+*/	
+
 }
+
 
 
 
@@ -236,13 +246,13 @@ void Criar_DIR(int connfd)
 {
 	char sendBuff[BYTE];
 	char recvBuff[BYTE];
-	//char current_dir_name[BYTE];
+	//char dir_Caminho[BYTE];
 	int tamBuff=0;
 
-	//getcwd(current_dir_name, sizeof(current_dir_name));
-	//printf("%s\n",current_dir_name);
+	//getcwd(dir_Caminho, sizeof(dir_Caminho));
+	//printf("%s\n",dir_Caminho);
 	
-	snprintf(sendBuff, sizeof(sendBuff), "Criar diretório, digite o nome: \n");
+	snprintf(sendBuff, sizeof(sendBuff), "\033[44mCriar diretório, digite o nome:\033[40m\n");
 	send(connfd,sendBuff,strlen(sendBuff), 0);
 	
 	tamBuff = recv(connfd,recvBuff,BYTE, 0);
@@ -254,11 +264,11 @@ void Criar_DIR(int connfd)
 		
 	if (system(comando) == 0)
 	{
-		snprintf(sendBuff, sizeof(sendBuff), "Diretório criado com sucesso. \n");
+		snprintf(sendBuff, sizeof(sendBuff), "\033[42mDiretório criado com sucesso.\033[40m\n");
 		send(connfd,sendBuff,strlen(sendBuff), 0);
 	}else
 		{			
-		snprintf(sendBuff, sizeof(sendBuff), " Erro ao criar diretório. \n");
+		snprintf(sendBuff, sizeof(sendBuff), "\033[41mErro ao criar diretório.\033[40m\n");
 		send(connfd,sendBuff,strlen(sendBuff), 0);
 		}
 }
@@ -269,13 +279,13 @@ void Remover_DIR(int connfd)
 {
 	char sendBuff[BYTE];
 	char recvBuff[BYTE];
-	//char current_dir_name[BYTE];
+	//char dir_Caminho[BYTE];
 	int tamBuff=0;
 
-	//getcwd(current_dir_name, sizeof(current_dir_name));
-	//printf("%s\n",current_dir_name);
+	//getcwd(dir_Caminho, sizeof(dir_Caminho));
+	//printf("%s\n",dir_Caminho);
 	
-	snprintf(sendBuff, sizeof(sendBuff), "Remover diretório, digite o nome: \n");
+	snprintf(sendBuff, sizeof(sendBuff), "\033[44mRemover diretório, digite o nome:\033[40m\n");
 	send(connfd,sendBuff,strlen(sendBuff), 0);
 	
 	tamBuff = recv(connfd,recvBuff,BYTE, 0);
@@ -287,28 +297,28 @@ void Remover_DIR(int connfd)
 		
 	if (system(comando) == 0)
 	{
-		snprintf(sendBuff, sizeof(sendBuff), "Diretório removido com sucesso. \n");
+		snprintf(sendBuff, sizeof(sendBuff), "\033[42mDiretório removido com sucesso.\033[40m\n");
 		send(connfd,sendBuff,strlen(sendBuff), 0);
 	}else
 		{			
-		snprintf(sendBuff, sizeof(sendBuff), " Erro ao remover diretório. \n");
+		snprintf(sendBuff, sizeof(sendBuff), "\033[41mErro ao remover diretório.\033[40m\n");
 		send(connfd,sendBuff,strlen(sendBuff), 0);
 		}	
 }  
 
 
 
-void Entrar_DIR(int connfd, DIR **current_dir)
+void Entrar_DIR(int connfd, DIR **dir_Atual)
 {
 	char sendBuff[BYTE];
 	char recvBuff[BYTE];
-	char current_dir_name[BYTE];
+	char dir_Caminho[BYTE];
 	char pasta[BYTE];
 	int tamBuff=0;
 
-	getcwd(current_dir_name, sizeof(current_dir_name));
+	getcwd(dir_Caminho, sizeof(dir_Caminho));
 	
-	snprintf(sendBuff, sizeof(sendBuff), "Entrar em diretório, digite o nome: \n");
+	snprintf(sendBuff, sizeof(sendBuff), "\033[44mEntrar em diretório, digite o nome:\033[40m\n");
 	send(connfd,sendBuff,strlen(sendBuff), 0);
 	
 	tamBuff = recv(connfd,recvBuff,BYTE, 0);
@@ -317,79 +327,79 @@ void Entrar_DIR(int connfd, DIR **current_dir)
 	
 	memset(pasta, 0, sizeof(pasta)); // preenche área de memoria com 0
 	
-    strcpy(pasta,current_dir_name);
+    strcpy(pasta,dir_Caminho);
 	strcat(pasta,"/");
 	strcat(pasta,recvBuff);
 	
     if (chdir(pasta) == 0)	// chdir - altera o diretório de trabalho
 	{
-        getcwd(current_dir_name, sizeof(current_dir_name)); // getcwd - obtém o nome do caminho do diretório de trabalho atual
-        *current_dir = opendir(current_dir_name);	// opendir - abre um diretório
-		printf("Entrou no diretório> %s \n",current_dir_name);
+        getcwd(dir_Caminho, sizeof(dir_Caminho)); // getcwd - obtém o nome do caminho do diretório de trabalho atual
+        *dir_Atual = opendir(dir_Caminho);	// opendir - abre um diretório
+		printf("Entrou no diretório> %s \n",dir_Caminho);
 		
-		snprintf(sendBuff, sizeof(sendBuff), "> Diretório atual: %s\n",current_dir_name);
+		snprintf(sendBuff, sizeof(sendBuff), "\033[42mDiretório atual:\033[40m %s\n",dir_Caminho);
 		send(connfd,sendBuff,strlen(sendBuff), 0);
 	}else
 		{			
-		snprintf(sendBuff, sizeof(sendBuff), " Erro ao entrar em diretório. \n");
+		snprintf(sendBuff, sizeof(sendBuff), "\033[41mErro ao entrar em diretório.\033[40m\n");
 		send(connfd,sendBuff,strlen(sendBuff), 0);
 		}
 } 
 
 
 
-void Sair_DIR(int connfd, DIR **current_dir)
+void Sair_DIR(int connfd, DIR **dir_Atual)
 {
 	char sendBuff[BYTE];
 	char recvBuff[BYTE];
-	char current_dir_name[BYTE];
+	char dir_Caminho[BYTE];
 	char pasta[BYTE];
 	int tamBuff=0;
 
-	getcwd(current_dir_name, sizeof(current_dir_name));
+	getcwd(dir_Caminho, sizeof(dir_Caminho));
 	
 	memset(pasta, 0, sizeof(pasta)); // preenche área de memoria com 0
 	
-    strcpy(pasta,current_dir_name);
+    strcpy(pasta,dir_Caminho);
 	strcat(pasta,"/..");
 	
     if (chdir(pasta) == 0)	// chdir - altera o diretório de trabalho
 	{
-        getcwd(current_dir_name, sizeof(current_dir_name)); // getcwd - obtém o nome do caminho do diretório de trabalho atual
-        *current_dir = opendir(current_dir_name);	// opendir - abre um diretório
-		printf("Retornou no diretório> %s \n",current_dir_name);
+        getcwd(dir_Caminho, sizeof(dir_Caminho)); // getcwd - obtém o nome do caminho do diretório de trabalho atual
+        *dir_Atual = opendir(dir_Caminho);	// opendir - abre um diretório
+		printf("Retornou no diretório> %s \n",dir_Caminho);
 		
-		snprintf(sendBuff, sizeof(sendBuff), "Diretório atual > %s\n",current_dir_name);
+		snprintf(sendBuff, sizeof(sendBuff), "\033[42mDiretório atual >\033[40m %s\n",dir_Caminho);
 		send(connfd,sendBuff,strlen(sendBuff), 0);
 	}else
 		{			
-		snprintf(sendBuff, sizeof(sendBuff), " Erro ao retornar em diretório. \n");
+		snprintf(sendBuff, sizeof(sendBuff), "\033[41mErro ao retornar em diretório.\033[40m\n");
 		send(connfd,sendBuff,strlen(sendBuff), 0);
 		}
 }
 
 
 
-void Mostrar_DIR(int connfd, DIR *current_dir)
+void Mostrar_DIR(int connfd, DIR *dir_Atual)
 {
 	char sendBuff[BYTE];
 	char recvBuff[BYTE];
-	char current_dir_name[BYTE];
+	char dir_Caminho[BYTE];
 	struct dirent *dir = NULL;
 	
-	getcwd(current_dir_name, sizeof(current_dir_name));
+	getcwd(dir_Caminho, sizeof(dir_Caminho));
 	
 	memset(sendBuff, 0, sizeof(sendBuff)); // preenche área de memoria com 0
 	
-	strcat(sendBuff,"Diretótio > ");
-	strcat(sendBuff,current_dir_name);
+	strcat(sendBuff,"\033[42mDiretótio >\033[40m ");
+	strcat(sendBuff,dir_Caminho);
 	strcat(sendBuff,"\n\n\t");
-	while(dir = readdir(current_dir)){
+	while(dir = readdir(dir_Atual)){
 		strcat(sendBuff, dir->d_name);
 		strcat(sendBuff, "\t\n\t");
 	}
 	strcat(sendBuff, "\n");
-	rewinddir(current_dir);	// rewinddir - redefine a posição de um fluxo de diretório para o início de um diretório
+	rewinddir(dir_Atual);	// rewinddir - redefine a posição de um fluxo de diretório para o início de um diretório
 	send(connfd,sendBuff,strlen(sendBuff),0);
 } 
 
@@ -399,13 +409,13 @@ void Criar_FILE(int connfd)
 {
 	char sendBuff[BYTE];
 	char recvBuff[BYTE];
-	//char current_dir_name[BYTE];
+	//char dir_Caminho[BYTE];
 	int tamBuff=0;
 
-	//getcwd(current_dir_name, sizeof(current_dir_name));
-	//printf("%s\n",current_dir_name);
+	//getcwd(dir_Caminho, sizeof(dir_Caminho));
+	//printf("%s\n",dir_Caminho);
 	
-	snprintf(sendBuff, sizeof(sendBuff), "Criar arquivo, digite o nome: \n");
+	snprintf(sendBuff, sizeof(sendBuff), "\033[44mCriar arquivo, digite o nome:\033[40m\n");
 	send(connfd,sendBuff,strlen(sendBuff), 0);
 	
 	tamBuff = recv(connfd,recvBuff,BYTE, 0);
@@ -417,11 +427,11 @@ void Criar_FILE(int connfd)
 		
 	if (system(comando) == 0)
 	{
-		snprintf(sendBuff, sizeof(sendBuff), "Arquivo criado com sucesso. \n");
+		snprintf(sendBuff, sizeof(sendBuff), "\033[42mArquivo criado com sucesso.\033[40m\n");
 		send(connfd,sendBuff,strlen(sendBuff), 0);
 	}else
 		{			
-		snprintf(sendBuff, sizeof(sendBuff), " Erro ao criar arquivo. \n");
+		snprintf(sendBuff, sizeof(sendBuff), "\033[41mErro ao criar arquivo.\033[40m\n");
 		send(connfd,sendBuff,strlen(sendBuff), 0);
 		}
 }
@@ -432,13 +442,13 @@ void Remover_FILE(int connfd)
 {
 	char sendBuff[BYTE];
 	char recvBuff[BYTE];
-	//char current_dir_name[BYTE];
+	//char dir_Caminho[BYTE];
 	int tamBuff=0;
 
-	//getcwd(current_dir_name, sizeof(current_dir_name));
-	//printf("%s\n",current_dir_name);
+	//getcwd(dir_Caminho, sizeof(dir_Caminho));
+	//printf("%s\n",dir_Caminho);
 	
-	snprintf(sendBuff, sizeof(sendBuff), "Remover arquivo, digite o nome: \n");
+	snprintf(sendBuff, sizeof(sendBuff), "\033[44mRemover arquivo, digite o nome:\033[40m\n");
 	send(connfd,sendBuff,strlen(sendBuff), 0);
 	
 	tamBuff = recv(connfd,recvBuff,BYTE, 0);
@@ -450,11 +460,11 @@ void Remover_FILE(int connfd)
 	
 	if (system(comando) == 0)
 	{
-		snprintf(sendBuff, sizeof(sendBuff), "Arquivo removido com sucesso. \n");
+		snprintf(sendBuff, sizeof(sendBuff), "\033[42mArquivo removido com sucesso.\033[40m\n");
 		send(connfd,sendBuff,strlen(sendBuff), 0);
 	}else
 		{			
-		snprintf(sendBuff, sizeof(sendBuff), "Erro ao remover arquivo. \n");
+		snprintf(sendBuff, sizeof(sendBuff), "\033[41mErro ao remover arquivo.\033[40m\n");
 		send(connfd,sendBuff,strlen(sendBuff), 0);
 		}
 }  
@@ -465,14 +475,13 @@ void Escrever_FILE(int connfd)
 {
 	char sendBuff[BYTE];
 	char recvBuff[BYTE];
-	char conteudo[BYTE];
-	//char current_dir_name[BYTE];
+	//char dir_Caminho[BYTE];
 	int tamBuff=0;
 
-	//getcwd(current_dir_name, sizeof(current_dir_name));
-	//printf("%s\n",current_dir_name);
+	//getcwd(dir_Caminho, sizeof(dir_Caminho));
+	//printf("%s\n",dir_Caminho);
 	
-	snprintf(sendBuff, sizeof(sendBuff), "Escrever em arquivo, digite o nome: \n");
+	snprintf(sendBuff, sizeof(sendBuff), "\033[44mEscrever em arquivo, digite o nome:\033[40m\n");
 	send(connfd,sendBuff,strlen(sendBuff), 0);
 	
 	tamBuff = recv(connfd,recvBuff,BYTE, 0);
@@ -483,7 +492,7 @@ void Escrever_FILE(int connfd)
 	
 	if(arquivo = fopen(recvBuff,"a+")) // abertura como escrita no final e não cria novo arquivo se não existir
 	{ 
-		snprintf(sendBuff, sizeof(sendBuff), "Digite o texto: \n");
+		snprintf(sendBuff, sizeof(sendBuff), "\033[44mDigite o texto:\033[40m\n");
 		send(connfd,sendBuff,strlen(sendBuff), 0);	
 		
 		tamBuff = recv(connfd,recvBuff,BYTE, 0);
@@ -494,17 +503,17 @@ void Escrever_FILE(int connfd)
 		
 		if(fprintf(arquivo,recvBuff) < 0)
 		{
-			snprintf(sendBuff, sizeof(sendBuff), "Não foi possivel escrever no arquivo.\n");
+			snprintf(sendBuff, sizeof(sendBuff), "\033[41mNão foi possivel escrever no arquivo.\033[40m\n");
 			send(connfd,sendBuff,strlen(sendBuff), 0);
 		}else
 			{
-				snprintf(sendBuff, sizeof(sendBuff), "Arquivo salvo. \n");
+				snprintf(sendBuff, sizeof(sendBuff), "\033[42mArquivo salvo.\033[40m \n");
 				send(connfd,sendBuff,strlen(sendBuff), 0);			
 			}
 		
 	}else
 		{			
-		snprintf(sendBuff, sizeof(sendBuff), "Não foi possivel abrir o arquivo.\n");
+		snprintf(sendBuff, sizeof(sendBuff), "\033[41mNão foi possivel abrir o arquivo.\033[40m\n");
 		send(connfd,sendBuff,strlen(sendBuff), 0);
 		}
 	fclose(arquivo);
@@ -517,13 +526,13 @@ void Mostrar_FILE(int connfd)
 	char sendBuff[BYTE];
 	char recvBuff[BYTE];
 	char conteudo[BYTE];
-	//char current_dir_name[BYTE];
+	//char dir_Caminho[BYTE];
 	int tamBuff=0;
 
-	//getcwd(current_dir_name, sizeof(current_dir_name));
-	//printf("%s\n",current_dir_name);
+	//getcwd(dir_Caminho, sizeof(dir_Caminho));
+	//printf("%s\n",dir_Caminho);
 	
-	snprintf(sendBuff, sizeof(sendBuff), "Mostrar arquivo, digite o nome: \n");
+	snprintf(sendBuff, sizeof(sendBuff), "\033[44mMostrar arquivo, digite o nome:\033[40m\n");
 	send(connfd,sendBuff,strlen(sendBuff), 0);
 	
 	tamBuff = recv(connfd,recvBuff,BYTE, 0);
@@ -535,13 +544,16 @@ void Mostrar_FILE(int connfd)
 	if(arquivo = fopen(recvBuff,"r"))
 	{ 
 		memset(sendBuff, 0, sizeof(sendBuff)); // preenche área de memoria com 0
-		strcat(sendBuff,"\n");
-		fread(sendBuff, sizeof(char),BYTE-2,arquivo);
+		memset(conteudo, 0, sizeof(sendBuff)); // preenche área de memoria com 0
+		
+		fread(conteudo, sizeof(char),BYTE-3,arquivo);
+		strcat(sendBuff,"\n\n");
+		strcat(sendBuff,conteudo);
 		strcat(sendBuff,"\n");
 		send(connfd,sendBuff,strlen(sendBuff), 0);
 	}else
 		{			
-		snprintf(sendBuff, sizeof(sendBuff), "Não foi possivel abrir o arquivo.\n");
+		snprintf(sendBuff, sizeof(sendBuff), "\033[41mNão foi possivel abrir o arquivo.\033[40m\n");
 		send(connfd,sendBuff,strlen(sendBuff), 0);
 		}
 	fclose(arquivo);
@@ -555,7 +567,7 @@ void CMD(int connfd)
 	char recvBuff[BYTE];
 	int tamBuff=0;
 	
-	snprintf(sendBuff, sizeof(sendBuff), "Digite o comando: \n");
+	snprintf(sendBuff, sizeof(sendBuff), "\033[44mDigite o comando:\033[40m\n");
 	send(connfd,sendBuff,strlen(sendBuff), 0);
 	
 	tamBuff = recv(connfd,recvBuff,BYTE, 0);
@@ -567,11 +579,11 @@ void CMD(int connfd)
 	
 	if (system(comando) == 0)
 	{
-		snprintf(sendBuff, sizeof(sendBuff), "OK \n");
+		snprintf(sendBuff, sizeof(sendBuff), "\033[42mOK\033[40m \n");
 		send(connfd,sendBuff,strlen(sendBuff), 0);
 	}else
 		{			
-		snprintf(sendBuff, sizeof(sendBuff), " Erro ao chamar comando. \n");
+		snprintf(sendBuff, sizeof(sendBuff), "\033[41mErro ao chamar comando.\033[40m\n");
 		send(connfd,sendBuff,strlen(sendBuff), 0);
 		}
 		
@@ -585,7 +597,7 @@ void Invalido(int connfd)
 	char recvBuff[BYTE];
 	int tamBuff=0;
 	
-	snprintf(sendBuff, sizeof(sendBuff), "Comando inválido. Ajuda -h \n");
+	snprintf(sendBuff, sizeof(sendBuff), "\033[41mComando inválido. Ajuda -h\033[40m\n");
 	send(connfd,sendBuff,strlen(sendBuff), 0);
 }
 
