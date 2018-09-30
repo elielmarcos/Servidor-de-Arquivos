@@ -12,9 +12,12 @@
 #include <dirent.h>
 #include <pthread.h>
 #include <string.h>
+#include <math.h>
 
 
+#define M 53	// tamanho na tabela hash
 #define BYTE 16384
+//#define SERVER_IP "192.168.0.104"
 #define PORTA 5000
 #define BACKLOG 10
 #define TITULO "\n =======\033[43m SERVIDOR DE ARQUIVOS \033[40m=======\n\n"
@@ -34,6 +37,21 @@ void Invalido(int connfd);
 void retENT(char *recvBuff);
 void* Thread_Conexao(void *Con_socket);
 
+void Inicializa_hash(void);
+int Funcao_hash(char *arquivo);
+int Inserir_hash(char *arquivo, char operacao);
+int Remover_hash(char *arquivo);
+int Buscar_hash(char *arquivo);
+int R_hash(char *arquivo, int hash, int inc);
+int B_hash(char *arquivo, int hash, int inc);
+void Mostra_hash(void);
+
+struct Tabela_Hash{
+	int status;
+	char arquivo[BYTE];
+	char operacao;
+} Manipulacao_Arquivo[M];
+
 char dir_Raiz[BYTE];
 pthread_mutex_t mutex;
 
@@ -41,6 +59,9 @@ pthread_mutex_t mutex;
 int main(int argc, char *argv[]){
 	
 	setlocale(LC_ALL, "Portuguese");
+	system("clear");
+	
+	Inicializa_hash(); // inicializa tabela hash (ZERA)
 	
 	/*Listen File Descriptor (listenfd) and Conection File Descriptor (connfd)*/
 
@@ -65,6 +86,8 @@ int main(int argc, char *argv[]){
 	/*Instancia os campos do Struct*/
 	serv_addr.sin_family = AF_INET; // familia
 	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY); // endereço
+	
+	//serv_addr.sin_addr.s_addr = inet_addr(SERVER_IP);
 	serv_addr.sin_port = htons(PORTA); // porta
 
 	/* Associa um endereço ao descritor do socket */
@@ -131,12 +154,12 @@ void* Thread_Conexao(void *Con_socket)
 	stpcpy(dir_Caminho,dir_Raiz);
 	//dir_Atual = opendir(dir_Caminho);	// opendir - abre um diretório
 
-	printf(">Diretório atual: %s\n\n",dir_Caminho);
+	printf("> Diretório atual> %s\n\n",dir_Caminho);
 	
 	memset(sendBuff, 0, sizeof(sendBuff)); // preenche área de memoria com 0
 	memset(recvBuff, 0, sizeof(recvBuff)); // preenche área de memoria com 0
 
-	snprintf(sendBuff, sizeof(sendBuff), "Conectado!\n> Diretório atual: %s\n",dir_Caminho);
+	snprintf(sendBuff, sizeof(sendBuff), "Conectado!\n> Diretório atual> %s\n",dir_Caminho);
 	send(connfd,sendBuff,strlen(sendBuff), 0);
 
 		do
@@ -225,6 +248,12 @@ void* Thread_Conexao(void *Con_socket)
 			{
 				printf("> (%i) %s\n",id_socket,recvBuff);	
 			}else
+				
+			if (strcmp(recvBuff,"hash") == 0)
+			{
+				printf("> (%i) %s\n",id_socket,recvBuff);	
+				Mostra_hash();
+			}else
 				{
 					printf("> Cliente %i digitou comando inválido.\n",id_socket);
 					Invalido(connfd);				
@@ -279,7 +308,6 @@ void Criar_DIR(int connfd, char *dir_Caminho)
 		char comando[BYTE]  = "mkdir ";
 		strcat(comando,recvBuff);
 			
-		pthread_mutex_lock(&mutex);
 		if (system(comando) == 0)
 		{
 			snprintf(sendBuff, sizeof(sendBuff), "\033[42mDiretório criado com sucesso.\033[40m\n");
@@ -289,7 +317,6 @@ void Criar_DIR(int connfd, char *dir_Caminho)
 			snprintf(sendBuff, sizeof(sendBuff), "\033[41mErro ao criar diretório.\033[40m\n");
 			send(connfd,sendBuff,strlen(sendBuff), 0);
 			}
-		pthread_mutex_unlock(&mutex);
 	}else
 		{			
 		stpcpy(dir_Caminho,dir_Raiz);
@@ -364,7 +391,7 @@ void Entrar_DIR(int connfd, char *dir_Caminho)
 			getcwd(dir_Caminho, BYTE); // getcwd - obtém o nome do caminho do diretório de trabalho atual
 			printf("Entrou no diretório> %s \n",dir_Caminho);
 			
-			snprintf(sendBuff, sizeof(sendBuff), "\033[42mDiretório atual:\033[40m %s\n",dir_Caminho);
+			snprintf(sendBuff, sizeof(sendBuff), "\033[42mDiretório atual>\033[40m %s\n",dir_Caminho);
 			send(connfd,sendBuff,strlen(sendBuff), 0);
 		}else
 			{			
@@ -400,7 +427,7 @@ void Sair_DIR(int connfd, char *dir_Caminho)
 			getcwd(dir_Caminho, BYTE); // getcwd - obtém o nome do caminho do diretório de trabalho atual
 			printf("Retornou no diretório> %s \n",dir_Caminho);
 			
-			snprintf(sendBuff, sizeof(sendBuff), "\033[42mDiretório atual >\033[40m %s\n",dir_Caminho);
+			snprintf(sendBuff, sizeof(sendBuff), "\033[42mDiretório atual>\033[40m %s\n",dir_Caminho);
 			send(connfd,sendBuff,strlen(sendBuff), 0);
 		}else
 			{			
@@ -430,7 +457,7 @@ void Mostrar_DIR(int connfd, char *dir_Caminho)
 		dir_Atual = opendir(dir_Caminho); 
 		memset(sendBuff, 0, sizeof(sendBuff)); // preenche área de memoria com 0
 		
-		strcat(sendBuff,"\033[42mDiretótio >\033[40m ");
+		strcat(sendBuff,"\033[42mDiretótio>\033[40m ");
 		strcat(sendBuff,dir_Caminho);
 		strcat(sendBuff,"\n\n\t");
 		while(dir = readdir(dir_Atual)){
@@ -492,6 +519,7 @@ void Remover_FILE(int connfd, char *dir_Caminho)
 {
 	char sendBuff[BYTE];
 	char recvBuff[BYTE];
+	char arquivo[BYTE];
 	int tamBuff=0;
 
 	
@@ -504,18 +532,47 @@ void Remover_FILE(int connfd, char *dir_Caminho)
 		recvBuff[tamBuff] = 0x00;
 		retENT(recvBuff);
 		
-		char comando[BYTE]  = "rm ";
-		strcat(comando,recvBuff);
+		memset(arquivo, 0, sizeof(arquivo)); // preenche área de memoria com 0
+		strcpy(arquivo,dir_Caminho);
+		strcat(arquivo,"/");
+		strcat(arquivo,recvBuff);
 		
-		if (system(comando) == 0)
+		pthread_mutex_lock(&mutex);
+			int Em_uso = Buscar_hash(arquivo); // Retorna -1=Não Achou; 0=Mostrar; 1=Escrever; 2=Remover;
+			//Mostra_hash();
+		pthread_mutex_unlock(&mutex);
+		
+		if (Em_uso >= 0)
 		{
-			snprintf(sendBuff, sizeof(sendBuff), "\033[42mArquivo removido com sucesso.\033[40m\n");
+			snprintf(sendBuff, sizeof(sendBuff), "\033[41mArquivo sendo manipulado por outro Cliente.\033[40m\n");
 			send(connfd,sendBuff,strlen(sendBuff), 0);
 		}else
-			{			
-			snprintf(sendBuff, sizeof(sendBuff), "\033[41mErro ao remover arquivo.\033[40m\n");
-			send(connfd,sendBuff,strlen(sendBuff), 0);
-			}
+			{		
+			char comando[BYTE]  = "rm ";
+			strcat(comando,recvBuff);
+			
+			pthread_mutex_lock(&mutex);
+				if (Inserir_hash(arquivo,'R') == -1)
+					printf("\033[41mErro ao inserir na Hash.\033[40m\n");
+				//Mostra_hash();
+			pthread_mutex_unlock(&mutex);
+			
+			if (system(comando) == 0)
+			{
+				snprintf(sendBuff, sizeof(sendBuff), "\033[42mArquivo removido com sucesso.\033[40m\n");
+				send(connfd,sendBuff,strlen(sendBuff), 0);
+			}else
+				{			
+				snprintf(sendBuff, sizeof(sendBuff), "\033[41mErro ao remover arquivo.\033[40m\n");
+				send(connfd,sendBuff,strlen(sendBuff), 0);
+				}
+			
+			pthread_mutex_lock(&mutex);
+				if (Remover_hash(arquivo) == -1)
+					printf("\033[41mErro ao remover na Hash.\033[40m\n");
+				//Mostra_hash();
+			pthread_mutex_unlock(&mutex);
+		}
 	}else
 		{			
 		stpcpy(dir_Caminho,dir_Raiz);
@@ -530,6 +587,7 @@ void Escrever_FILE(int connfd, char *dir_Caminho)
 {
 	char sendBuff[BYTE];
 	char recvBuff[BYTE];
+	char arquivo[BYTE];
 	int tamBuff=0;
 	
 	
@@ -541,36 +599,66 @@ void Escrever_FILE(int connfd, char *dir_Caminho)
 		tamBuff = recv(connfd,recvBuff,BYTE, 0);
 		recvBuff[tamBuff] = 0x00;
 		retENT(recvBuff);
-	 
-		FILE *arquivo; 
 		
-		if(arquivo = fopen(recvBuff,"a+")) // abertura como escrita no final e não cria novo arquivo se não existir
-		{ 
-			snprintf(sendBuff, sizeof(sendBuff), "\033[44mDigite o texto:\033[40m\n");
-			send(connfd,sendBuff,strlen(sendBuff), 0);	
-			
-			tamBuff = recv(connfd,recvBuff,BYTE, 0);
-			recvBuff[tamBuff] = 0x00;
-			retENT(recvBuff);
-			
-			strcat(recvBuff,"\n");
-			
-			if(fprintf(arquivo,recvBuff) < 0)
-			{
-				snprintf(sendBuff, sizeof(sendBuff), "\033[41mNão foi possivel escrever no arquivo.\033[40m\n");
-				send(connfd,sendBuff,strlen(sendBuff), 0);
-			}else
-				{
-					snprintf(sendBuff, sizeof(sendBuff), "\033[42mArquivo salvo.\033[40m \n");
-					send(connfd,sendBuff,strlen(sendBuff), 0);			
-				}
-			
-		}else
-			{			
-			snprintf(sendBuff, sizeof(sendBuff), "\033[41mNão foi possivel abrir o arquivo.\033[40m\n");
+		memset(arquivo, 0, sizeof(arquivo)); // preenche área de memoria com 0
+		strcpy(arquivo,dir_Caminho);
+		strcat(arquivo,"/");
+		strcat(arquivo,recvBuff);
+		
+		pthread_mutex_lock(&mutex);
+			int Em_uso = Buscar_hash(arquivo); // Retorna -1=Não Achou; 0=Mostrar; 1=Escrever; 2=Remover;
+			//Mostra_hash();
+		pthread_mutex_unlock(&mutex);
+		
+		if (Em_uso >= 0)
+		{
+			snprintf(sendBuff, sizeof(sendBuff), "\033[41mArquivo sendo manipulado por outro Cliente.\033[40m\n");
 			send(connfd,sendBuff,strlen(sendBuff), 0);
-			}
-		fclose(arquivo);
+		}else
+			{
+	 
+			FILE *nome_arquivo; 
+			
+			pthread_mutex_lock(&mutex);
+				if (Inserir_hash(arquivo,'E') == -1)
+					printf("\033[41mErro ao inserir na Hash.\033[40m\n");
+				//Mostra_hash();
+			pthread_mutex_unlock(&mutex);
+			
+			if(nome_arquivo = fopen(recvBuff,"a+")) // abertura como escrita no final e não cria novo arquivo se não existir
+			{ 
+				snprintf(sendBuff, sizeof(sendBuff), "\033[44mDigite o texto:\033[40m\n");
+				send(connfd,sendBuff,strlen(sendBuff), 0);	
+				
+				tamBuff = recv(connfd,recvBuff,BYTE, 0);
+				recvBuff[tamBuff] = 0x00;
+				retENT(recvBuff);
+				
+				strcat(recvBuff,"\n");
+				
+				if(fprintf(nome_arquivo,recvBuff) < 0)
+				{
+					snprintf(sendBuff, sizeof(sendBuff), "\033[41mNão foi possivel escrever no arquivo.\033[40m\n");
+					send(connfd,sendBuff,strlen(sendBuff), 0);
+				}else
+					{
+						snprintf(sendBuff, sizeof(sendBuff), "\033[42mArquivo salvo.\033[40m \n");
+						send(connfd,sendBuff,strlen(sendBuff), 0);			
+					}
+				
+			}else
+				{			
+				snprintf(sendBuff, sizeof(sendBuff), "\033[41mNão foi possivel abrir o arquivo.\033[40m\n");
+				send(connfd,sendBuff,strlen(sendBuff), 0);
+				}
+			fclose(nome_arquivo);
+			
+			pthread_mutex_lock(&mutex);
+				if (Remover_hash(arquivo) == -1)
+					printf("\033[41mErro ao remover na Hash.\033[40m\n");
+				//Mostra_hash();
+			pthread_mutex_unlock(&mutex);
+		}
 	}else
 		{			
 		stpcpy(dir_Caminho,dir_Raiz);
@@ -585,6 +673,7 @@ void Mostrar_FILE(int connfd, char *dir_Caminho)
 {
 	char sendBuff[BYTE];
 	char recvBuff[BYTE];
+	char arquivo[BYTE];
 	char conteudo[BYTE];
 	int tamBuff=0;
 
@@ -597,25 +686,55 @@ void Mostrar_FILE(int connfd, char *dir_Caminho)
 		tamBuff = recv(connfd,recvBuff,BYTE, 0);
 		recvBuff[tamBuff] = 0x00;
 		retENT(recvBuff);
-	 
-		FILE *arquivo; 
 		
-		if(arquivo = fopen(recvBuff,"r"))
-		{ 
-			memset(sendBuff, 0, sizeof(sendBuff)); // preenche área de memoria com 0
-			memset(conteudo, 0, sizeof(sendBuff)); // preenche área de memoria com 0
-			
-			fread(conteudo, sizeof(char),BYTE-3,arquivo);
-			strcat(sendBuff,"\n\n");
-			strcat(sendBuff,conteudo);
-			strcat(sendBuff,"\n");
+		memset(arquivo, 0, sizeof(arquivo)); // preenche área de memoria com 0
+		strcpy(arquivo,dir_Caminho);
+		strcat(arquivo,"/");
+		strcat(arquivo,recvBuff);
+		
+		pthread_mutex_lock(&mutex);
+			int Em_uso = Buscar_hash(arquivo); // Retorna -1=Não Achou; 0=Mostrar; 1=Escrever; 2=Remover;
+			//Mostra_hash();
+		pthread_mutex_unlock(&mutex);
+		
+		if (Em_uso >= 1)
+		{
+			snprintf(sendBuff, sizeof(sendBuff), "\033[41mArquivo sendo manipulado por outro Cliente.\033[40m\n");
 			send(connfd,sendBuff,strlen(sendBuff), 0);
 		}else
-			{			
-			snprintf(sendBuff, sizeof(sendBuff), "\033[41mNão foi possivel abrir o arquivo.\033[40m\n");
-			send(connfd,sendBuff,strlen(sendBuff), 0);
-			}
-		fclose(arquivo);
+			{
+	 
+			FILE *nome_arquivo; 
+			
+			pthread_mutex_lock(&mutex);
+				if (Inserir_hash(arquivo,'M') == -1)
+					printf("\033[41mErro ao inserir na Hash.\033[40m\n");
+				//Mostra_hash();
+			pthread_mutex_unlock(&mutex);
+			
+			if(nome_arquivo = fopen(recvBuff,"r"))
+			{ 
+				memset(sendBuff, 0, sizeof(sendBuff)); // preenche área de memoria com 0
+				memset(conteudo, 0, sizeof(sendBuff)); // preenche área de memoria com 0
+				
+				fread(conteudo, sizeof(char),BYTE-3,nome_arquivo);
+				strcat(sendBuff,"\n\n");
+				strcat(sendBuff,conteudo);
+				strcat(sendBuff,"\n");
+				send(connfd,sendBuff,strlen(sendBuff), 0);
+			}else
+				{			
+				snprintf(sendBuff, sizeof(sendBuff), "\033[41mNão foi possivel abrir o arquivo.\033[40m\n");
+				send(connfd,sendBuff,strlen(sendBuff), 0);
+				}
+			fclose(nome_arquivo);
+			
+			pthread_mutex_lock(&mutex);
+				if (Remover_hash(arquivo) == -1)
+					printf("\033[41mErro ao remover na Hash.\033[40m\n");
+				//Mostra_hash();
+			pthread_mutex_unlock(&mutex);
+		}
 	}else
 		{			
 		stpcpy(dir_Caminho,dir_Raiz);
@@ -673,6 +792,251 @@ void retENT(char *recvBuff)	// remove ENTER do final do buffer
 	
 	if (recvBuff[strlen(recvBuff)-1] == 10)
 		recvBuff[strlen(recvBuff)-1] = 0x00;	
+}
+
+
+
+
+
+//******************** CODIGO TABELA HASH ******************//
+
+
+int Inserir_hash(char *arquivo, char operacao)
+{
+	strcpy(arquivo,strlwr(arquivo)); // converte a string para minuscula
+	
+	int hash = Funcao_hash(arquivo);
+	int cont = hash;
+	int i;
+	int Cheia = 1;
+	
+	for(i=0;i<M;i++)
+	{
+		if (Manipulacao_Arquivo[i].status == 0 || Manipulacao_Arquivo[i].status == 3)
+			Cheia = 0;
+	}
+	
+	if (Cheia) return(-1);
+	
+	if (Manipulacao_Arquivo[hash].status == 0)
+	{
+		Manipulacao_Arquivo[hash].status = 1;
+		strcpy(Manipulacao_Arquivo[hash].arquivo,arquivo);
+		Manipulacao_Arquivo[hash].operacao = operacao;
+		return(0);
+	}else 
+		
+	if (Manipulacao_Arquivo[hash].status == 1 || Manipulacao_Arquivo[hash].status == 2)
+	{
+		while(Manipulacao_Arquivo[cont].status == 1 || Manipulacao_Arquivo[cont].status == 2)
+		{
+			Manipulacao_Arquivo[cont++].status = 2;	
+			if (cont == M) cont = 0;
+			if (cont == hash) return(-1);
+		}
+		
+		if (Manipulacao_Arquivo[cont].status == 3)
+			Manipulacao_Arquivo[cont].status = 2;
+			else
+				Manipulacao_Arquivo[cont].status = 1;
+			
+		strcpy(Manipulacao_Arquivo[cont].arquivo,arquivo);
+		Manipulacao_Arquivo[cont].operacao = operacao;
+		return(0);
+	}else
+	
+	if (Manipulacao_Arquivo[hash].status == 3)
+	{
+		
+		Manipulacao_Arquivo[hash].status = 2;
+		strcpy(Manipulacao_Arquivo[hash].arquivo,arquivo);
+		Manipulacao_Arquivo[hash].operacao = operacao;
+		return(0);
+	}
+
+	return(-1);
+}
+
+
+
+int Remover_hash(char *arquivo)
+{
+	strcpy(arquivo,strlwr(arquivo)); // converte a string para minuscula
+	
+	int hash = Funcao_hash(arquivo);
+	
+	return R_hash(arquivo,hash,0);	
+}
+
+
+
+int R_hash(char *arquivo, int hash, int inc)
+{
+	int cont = hash;
+	
+	if (inc == M) return(-1);
+	
+	if (Manipulacao_Arquivo[hash].status == 0) // não existe nada
+	{
+		return(-1);
+	}else 
+		
+	if (Manipulacao_Arquivo[hash].status == 1) // existe algo
+	{
+		if (strcmp(Manipulacao_Arquivo[hash].arquivo,arquivo) == 0) // se esta aqui
+		{
+			Manipulacao_Arquivo[hash].status = 0; // ZERA POSIÇÃO
+			memset(&Manipulacao_Arquivo[hash].arquivo, 0, sizeof(Manipulacao_Arquivo[hash].arquivo));
+			Manipulacao_Arquivo[hash].operacao = ' ';
+			
+			cont--;
+			if (cont == -1) cont = M-1;
+
+			while(Manipulacao_Arquivo[cont].status == 3) // enquanto a posição a cima por 3
+			{
+				Manipulacao_Arquivo[cont--].status = 0; // zera a posição a cima atual
+				if (cont == -1) cont = M-1;
+			}
+			
+			if (Manipulacao_Arquivo[cont].status == 2) // se a posição a cima for 2 
+			{
+				Manipulacao_Arquivo[cont].status = 1; // seta a posição a cima para 1 
+			}
+			
+			return(0);
+		}else
+			return(-1); // se não, não esta aqui
+	}else
+		
+	if (Manipulacao_Arquivo[hash].status == 2) // existe algo, mas pode estar em outro lugar
+	{
+		if (strcmp(Manipulacao_Arquivo[hash].arquivo,arquivo) == 0) // se esta aqui
+		{
+			Manipulacao_Arquivo[hash].status = 3; // INDICA QUE ESTA VAZIO, MAS HOUVE QUE COLISÃO
+			memset(&Manipulacao_Arquivo[hash].arquivo, 0, sizeof(Manipulacao_Arquivo[hash].arquivo));
+			Manipulacao_Arquivo[hash].operacao = ' ';
+			return(0);
+		}else
+			
+		cont++;
+		if (cont == M) cont = 0;
+		return R_hash(arquivo,cont,inc++); // procura denovo na tabela com hash + 1
+	}else
+		
+	if (Manipulacao_Arquivo[hash].status == 3) // não existe nada, mas pode estar em outro lugar
+	{
+		cont++;
+		if (cont == M) cont = 0;
+		return R_hash(arquivo,cont,inc++); // procura denovo na tabela com hash + 1
+	}
+	
+	return(-1);	
+}
+
+
+
+
+int Buscar_hash(char *arquivo) // Retorna -1=Não Achou; 0=Mostrar; 1=Escrever; 2=Remover;
+{
+	strcpy(arquivo,strlwr(arquivo)); // converte a string para minuscula
+	
+	int hash = Funcao_hash(arquivo);
+	
+	return B_hash(arquivo,hash,0);
+}
+
+
+
+int B_hash(char *arquivo, int hash, int inc)
+{
+	int cont = hash;
+	
+	if (inc == M) return(-1);
+	
+	if (Manipulacao_Arquivo[hash].status == 0) // não existe nada
+	{
+		return(-1);
+	}else 
+		
+	if (Manipulacao_Arquivo[hash].status == 1) // existe algo
+	{
+		if (strcmp(Manipulacao_Arquivo[hash].arquivo,arquivo) == 0) // se esta aqui
+		{
+			if (Manipulacao_Arquivo[hash].operacao == 'M') return(0);
+			if (Manipulacao_Arquivo[hash].operacao == 'E') return(1);
+			if (Manipulacao_Arquivo[hash].operacao == 'R') return(2);
+			if (Manipulacao_Arquivo[hash].operacao == ' ') return(-1);
+		}else
+			return(-1); // se não, não esta aqui
+	}else
+		
+	if (Manipulacao_Arquivo[hash].status == 2) // existe algo, mas pode estar em outro lugar
+	{
+		if (strcmp(Manipulacao_Arquivo[hash].arquivo,arquivo) == 0) // se esta aqui
+		{
+			if (Manipulacao_Arquivo[hash].operacao == 'M') return(0);
+			if (Manipulacao_Arquivo[hash].operacao == 'E') return(1);
+			if (Manipulacao_Arquivo[hash].operacao == 'R') return(2);
+			if (Manipulacao_Arquivo[hash].operacao == ' ') return(-1);
+		}else
+			
+		cont++;
+		if (cont == M) cont = 0;
+		return B_hash(arquivo,cont,inc++); // procura denovo na tabela com hash + 1
+	}else
+		
+	if (Manipulacao_Arquivo[hash].status == 3) // não existe nada, mas pode estar em outro lugar
+	{
+		cont++;
+		if (cont == M) cont = 0;
+		return B_hash(arquivo,cont,inc++); // procura denovo na tabela com hash + 1
+	}
+	
+	return(-1);	
+}
+
+
+
+int Funcao_hash(char *arquivo)
+{
+	strcpy(arquivo,strlwr(arquivo)); // converte a string para minuscula
+	
+	int tam = strlen(arquivo);
+	int i=0;
+	int hash=0;
+	
+	
+	for (i=0;i<tam;i++)
+	{
+		hash = (int)((int)pow((arquivo[i]+hash),2.7) % M);
+		//printf("\n%i - %i",arquivo[i],hash);
+	}
+
+	return hash;
+	
+}
+
+void Mostra_hash(void)
+{
+	int i=0;
+	
+	for(i=0;i<M;i++)
+		printf("\n\t%03i -| %i | %s | %c |",i,Manipulacao_Arquivo[i].status,Manipulacao_Arquivo[i].arquivo,Manipulacao_Arquivo[i].operacao);
+	
+	printf("\n\n");
+}
+
+
+void Inicializa_hash(void)
+{
+	int i;
+	
+	for(i=0;i<M;i++)
+	{
+		Manipulacao_Arquivo[i].status = 0;
+		memset(&Manipulacao_Arquivo[i].arquivo, 0, sizeof(Manipulacao_Arquivo[i].arquivo));
+		Manipulacao_Arquivo[i].operacao = ' ';
+	}	
 }
 
 

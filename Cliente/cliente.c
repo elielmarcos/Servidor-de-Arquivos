@@ -12,6 +12,7 @@
 
 
 
+//#define SERVER_IP "192.168.0.104"
 #define SERVER_IP "127.0.0.1"
 #define BYTE 16384
 #define PORTA 5000
