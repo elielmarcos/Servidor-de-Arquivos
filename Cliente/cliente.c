@@ -25,8 +25,9 @@ int main(int argc, char *argv[])
 {
 
 	setlocale(LC_ALL, "Portuguese");
-    char mensagem[BYTE], *loc;
-    int tbuf, skt, escolha;
+    int tamBuff, skt;
+	char sendBuff[BYTE];
+	char recvBuff[BYTE];
     struct sockaddr_in serv;
 
     /**INICIALIZA ESTRUTURA SOCKETS*/
@@ -46,44 +47,43 @@ int main(int argc, char *argv[])
     printf("> Envie sair pra encerrar ou -h para ajuda \n\n");
 
 
+	memset(sendBuff, 0, sizeof(sendBuff)); // preenche área de memoria com 0
+	memset(recvBuff, 0, sizeof(recvBuff)); // preenche área de memoria com 0
+	
     /**RECEBE MENSAGEM DO SERVIDOR*/
-    tbuf = recv (skt, mensagem, BYTE, 0);
-    mensagem[tbuf] = 0x00;
-    printf ("> %s\n",mensagem);
+    tamBuff = recv (skt, recvBuff, BYTE, 0);
+    recvBuff[tamBuff] = 0x00;
+    printf ("> %s\n",recvBuff);
 
 
     /**LOOP DE COMUNICAÇÃO ENTRE CLIENTE E SERVIDOR*/
     do{
         ///envia
         printf("> ");
-        gets(mensagem);
-		if (strlen(mensagem)==0) strcpy(mensagem," ");
-        send(skt, mensagem, strlen(mensagem), 0);
+        gets(sendBuff);
+		if (strlen(sendBuff)==0) strcpy(sendBuff," ");
+        send(skt, sendBuff, strlen(sendBuff), 0);
 
-		if (strcmp(mensagem,"sair")!= 0)
+		if (strcmp(sendBuff,"sair")!= 0)
 		{
 			///recebe
-			tbuf = recv (skt, mensagem, BYTE, 0);
-			mensagem[tbuf] = 0x00;
-			printf ("> %s\n",mensagem);
+			tamBuff = recv (skt, recvBuff, BYTE, 0);
+			recvBuff[tamBuff] = 0x00;
+			printf ("> %s\n",recvBuff);
 		}
 
-    }while(strcmp(mensagem,"sair")!= 0);    ///COMUNICAÇÃO SE ENCERRA QUANDO USUARIO DIGITAR sair
+    }while(strcmp(sendBuff,"sair")!= 0);    ///COMUNICAÇÃO SE ENCERRA QUANDO USUARIO DIGITAR sair
 
 
     /**FINALIZA CONEXÃO*/
     close(skt);
     printf (">> \033[43mA conexão com o servidor foi finalizada!!!\033[40m\n\n");
-	sleep(3);
+	sleep(2);
     exit(0);
 }
 
 
 
-/**************************************************************
-*   FUNÇÃO RESPOSÁVEL POR IMPRIMIR MENSAGER NA TELA           *
-*   ENQUANTO AGUARDA ALGUM SERVIDOR ESTABELECER COMUNICAÇÃO   *
-***************************************************************/
 void Aguarde(){
     int i=0;
     char ponto[12] = "";

@@ -86,7 +86,6 @@ int main(int argc, char *argv[]){
 	/*Instancia os campos do Struct*/
 	serv_addr.sin_family = AF_INET; // familia
 	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY); // endereço
-	
 	//serv_addr.sin_addr.s_addr = inet_addr(SERVER_IP);
 	serv_addr.sin_port = htons(PORTA); // porta
 
@@ -114,28 +113,31 @@ int main(int argc, char *argv[]){
 
 	
 	getcwd(dir_Raiz, BYTE); // getcwd - obtém o nome do caminho do diretório de trabalho Raiz 
-	pthread_mutex_init(&mutex, NULL);
+	pthread_mutex_init(&mutex, NULL); // inicializa mutex
 	
 	while(1){
 		
 		printf("Aguardando conexão.\n\n");
 		
-		while(connfd = accept(listenfd, (struct sockaddr*)NULL,NULL))
+		while(connfd = accept(listenfd, (struct sockaddr*)NULL,NULL))  // estabele conexão para cadacliente
 		{
-			pthread_t Thread_Cliente;
 			
-			pthread_create(&Thread_Cliente, NULL, Thread_Conexao, &connfd);
+			pthread_t Thread_Cliente;	// cria thread
+			
+			pthread_create(&Thread_Cliente, NULL, Thread_Conexao, &connfd); // chama função para cada thread
 
 			sleep(1);
 		}
 
 	}
+	
+	pthread_mutex_destroy(&mutex);
 }
 
 
 
 
-void* Thread_Conexao(void *Con_socket)
+void* Thread_Conexao(void *Con_socket) // função de conexão da thread
 {
 	int connfd = *(int*)Con_socket;
 	char sendBuff[BYTE];
@@ -151,8 +153,7 @@ void* Thread_Conexao(void *Con_socket)
 			
 	printf("\nCliente %i conectado! \n",id_socket);
 			
-	stpcpy(dir_Caminho,dir_Raiz);
-	//dir_Atual = opendir(dir_Caminho);	// opendir - abre um diretório
+	stpcpy(dir_Caminho,dir_Raiz); // copia o diretorio raiz para diretorio inical da thread
 
 	printf("> Diretório atual> %s\n\n",dir_Caminho);
 	
@@ -178,78 +179,78 @@ void* Thread_Conexao(void *Con_socket)
 
 			}else
 			
-			if (strcmp(recvBuff,"cdir") == 0)
+			if (strcmp(recvBuff,"cdir") == 0)  // criar diretorio
 			{
 				printf("> (%i) %s\n",id_socket,recvBuff);
 				Criar_DIR(connfd,dir_Caminho);
 			}else
 			
-			if (strcmp(recvBuff,"rdir") == 0)
+			if (strcmp(recvBuff,"rdir") == 0) // excluir diretorio
 			{
 				printf("> (%i) %s\n",id_socket,recvBuff);
 				Remover_DIR(connfd,dir_Caminho);
 			}else
 			
-			if (strcmp(recvBuff,"edir") == 0)
+			if (strcmp(recvBuff,"edir") == 0) // acessar diretorio
 			{
 				printf("> (%i) %s\n",id_socket,recvBuff);
 				Entrar_DIR(connfd,dir_Caminho);
 			}else
 				
-			if (strcmp(recvBuff,"sdir") == 0)
+			if (strcmp(recvBuff,"sdir") == 0) // voltar um diretorio
 			{
 				printf("> (%i) %s\n",id_socket,recvBuff);
 				Sair_DIR(connfd,dir_Caminho);
 			}else
 
-			if (strcmp(recvBuff,"mdir") == 0)
+			if (strcmp(recvBuff,"mdir") == 0) // mostrat diretorio
 			{
 				printf("> (%i) %s\n",id_socket,recvBuff);
 				Mostrar_DIR(connfd,dir_Caminho);
 			}else
 			
-			if (strcmp(recvBuff,"cfile") == 0)
+			if (strcmp(recvBuff,"cfile") == 0) // criar arquivo
 			{
 				printf("> (%i) %s\n",id_socket,recvBuff);
 				Criar_FILE(connfd,dir_Caminho);
 			}else
 			
-			if (strcmp(recvBuff,"rfile") == 0)
+			if (strcmp(recvBuff,"rfile") == 0) // excluir arquivo
 			{
 				printf("> (%i) %s\n",id_socket,recvBuff);
 				Remover_FILE(connfd,dir_Caminho);
 			}else
 			
-			if (strcmp(recvBuff,"efile") == 0)
+			if (strcmp(recvBuff,"efile") == 0) // escrever no arquivo
 			{
 				printf("> (%i) %s\n",id_socket,recvBuff);
 				Escrever_FILE(connfd,dir_Caminho);
 			}else
 
-			if (strcmp(recvBuff,"mfile") == 0)
+			if (strcmp(recvBuff,"mfile") == 0) // mostrar arquivo
 			{
 				printf("> (%i) %s\n",id_socket,recvBuff);
 				Mostrar_FILE(connfd,dir_Caminho);
 			}else
 			
-			if (strcmp(recvBuff,"cmd") == 0)
+			if (strcmp(recvBuff,"cmd") == 0) // digitar um comando
 			{
 				printf("> (%i) %s\n",id_socket,recvBuff);
 				CMD(connfd);		
 			}else
 			
-			if (strcmp(recvBuff,"-h") == 0)
+			if (strcmp(recvBuff,"-h") == 0) // ajuda
 			{
 				printf("> (%i) %s\n",id_socket,recvBuff);
 				Ajuda(connfd);
 			}else
 				
-			if (strcmp(recvBuff,"sair") == 0)
+			if (strcmp(recvBuff,"sair") == 0) // finalizar
 			{
 				printf("> (%i) %s\n",id_socket,recvBuff);	
 			}else
 				
-			if (strcmp(recvBuff,"hash") == 0)
+			if (strcmp(recvBuff,"hash") == 0) // mostrar tabela hash
 			{
 				printf("> (%i) %s\n",id_socket,recvBuff);	
 				Mostra_hash();
@@ -262,9 +263,11 @@ void* Thread_Conexao(void *Con_socket)
 
 	printf("\nCliente %i desconectado.\n\n", id_socket);
 	
-	close(connfd);
+	close(connfd); // finalizar socket
 		
-	pthread_exit(0);
+	free(id_socket); // libera memoria
+	
+	pthread_exit(0); // finaliza thread
 
 }
 
@@ -448,8 +451,8 @@ void Mostrar_DIR(int connfd, char *dir_Caminho)
 {
 	char sendBuff[BYTE];
 	char recvBuff[BYTE];
-	DIR *dir_Atual = NULL;
-	struct dirent *dir = NULL;
+	DIR *dir_Atual = NULL; // O tipo de dados DIR representa um fluxo de diretório.
+	struct dirent *dir = NULL; // Esse é um tipo de estrutura usado para retornar informações sobre entradas de diretório.
 
 	
 	if (chdir(dir_Caminho) == 0)	// chdir - altera o diretório de trabalho
@@ -457,11 +460,11 @@ void Mostrar_DIR(int connfd, char *dir_Caminho)
 		dir_Atual = opendir(dir_Caminho); 
 		memset(sendBuff, 0, sizeof(sendBuff)); // preenche área de memoria com 0
 		
-		strcat(sendBuff,"\033[42mDiretótio>\033[40m ");
+		strcat(sendBuff,"\033[42mDiretório>\033[40m ");
 		strcat(sendBuff,dir_Caminho);
 		strcat(sendBuff,"\n\n\t");
-		while(dir = readdir(dir_Atual)){
-			strcat(sendBuff, dir->d_name);
+		while(dir = readdir(dir_Atual)){ // ler diretório
+			strcat(sendBuff, dir->d_name); //Esse é o componente de nome de arquivo terminado com nulo.
 			strcat(sendBuff, "\t\n\t");
 		}
 		strcat(sendBuff, "\n");
