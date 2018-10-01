@@ -15,7 +15,7 @@
 #include <math.h>
 
 
-#define M 53	// tamanho na tabela hash
+#define M 11	// tamanho na tabela hash
 #define BYTE 16384
 //#define SERVER_IP "192.168.0.104"
 #define PORTA 5000
@@ -254,6 +254,8 @@ void* Thread_Conexao(void *Con_socket) // função de conexão da thread
 			{
 				printf("> (%i) %s\n",id_socket,recvBuff);	
 				Mostra_hash();
+				snprintf(sendBuff, sizeof(sendBuff), "\033[42mOK\033[40m \n");
+				send(connfd,sendBuff,strlen(sendBuff), 0);
 			}else
 				{
 					printf("> Cliente %i digitou comando inválido.\n",id_socket);
